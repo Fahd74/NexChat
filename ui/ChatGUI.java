@@ -3,6 +3,7 @@ package ui;
 import client.ConnectionConfig;
 import client.NetworkManager;
 import client.ReconnectionHandler;
+import common.TimeUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -10,10 +11,14 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.io.IOException;
 
+/**
+ * Main chat window GUI — wired to NetworkManager for real-time messaging.
+ * Displays a 3-panel layout: left sidebar (navigation + online users),
+ * center chat area, and right info panel (members + server stats).
+ * All network calls are performed off the EDT via NetworkManager.
+ */
 public class ChatGUI extends JFrame {
 
     private static final Color BG_MAIN = new Color(0x1A1D2E);
@@ -38,7 +43,7 @@ public class ChatGUI extends JFrame {
     private JLabel statLatencyLabel;
 
     private final ConnectionConfig config;
-    private boolean isConnected = false;
+    private volatile boolean isConnected = false;
     private NetworkManager networkManager;
 
     public ChatGUI(ConnectionConfig config) {
@@ -60,11 +65,16 @@ public class ChatGUI extends JFrame {
         initRightPanel();
     }
 
+    /**
+     * Sets the NetworkManager instance used for sending/receiving messages.
+     * @param nm the connected NetworkManager
+     */
     public void setNetworkManager(NetworkManager nm) {
         this.networkManager = nm;
         setConnectionStatus(true);
     }
 
+    /** Called by NetworkManager when a CHAT message is received from another user. */
     public void onMessageReceived(String sender, String text, String timestamp) {
         SwingUtilities.invokeLater(() -> {
             MessageBubble.appendMessage(chatArea, sender, text, MessageBubble.MessageType.RECEIVED, timestamp);
@@ -72,6 +82,7 @@ public class ChatGUI extends JFrame {
         });
     }
 
+    /** Called by NetworkManager when a SYSTEM message is received. */
     public void onSystemMessage(String text, String timestamp) {
         SwingUtilities.invokeLater(() -> {
             MessageBubble.appendMessage(chatArea, "System", text, MessageBubble.MessageType.SYSTEM, timestamp);
@@ -79,6 +90,7 @@ public class ChatGUI extends JFrame {
         });
     }
 
+    /** Called by NetworkManager when a USERLIST message is received. */
     public void onUserListUpdated(String[] users) {
         SwingUtilities.invokeLater(() -> {
             userListModel.clear();
@@ -148,6 +160,7 @@ public class ChatGUI extends JFrame {
         membersBox.add(panel);
     }
 
+    /** Called by NetworkManager when the server connection is lost unexpectedly. */
     public void onConnectionLost() {
         SwingUtilities.invokeLater(() -> {
             isConnected = false;
@@ -162,29 +175,33 @@ public class ChatGUI extends JFrame {
         handler.attemptReconnect();
     }
 
+    /** Called by ReconnectionHandler on each retry attempt. */
     public void onReconnectAttempt(int attempt, int maxAttempts) {
         SwingUtilities.invokeLater(() -> {
             connectionStatusDot.setForeground(STATUS_RECONNECTING);
-            connectionStatusText.setText("Reconnecting...");
+            connectionStatusText.setText("Reconnecting... " + attempt + "/" + maxAttempts);
         });
     }
 
+    /** Called by ReconnectionHandler when reconnection succeeds. */
     public void onReconnected() {
         SwingUtilities.invokeLater(() -> {
             isConnected = true;
             setConnectionStatus(true);
             showSystemMessage("Reconnected successfully.");
-            statLatencyLabel.setText("12ms"); // Mock latency
+            statLatencyLabel.setText("12ms");
             statLatencyLabel.setForeground(STATUS_ONLINE);
         });
-        networkManager.startReceiving(this);
+        // Start receiving on a NEW background thread — never on the EDT
+        new Thread(() -> networkManager.startReceiving(this), "NexChat-PostReconnect").start();
     }
 
+    /** Called by ReconnectionHandler when all reconnect attempts are exhausted. */
     public void onReconnectFailed() {
         SwingUtilities.invokeLater(() -> {
             connectionStatusDot.setForeground(STATUS_OFFLINE);
             connectionStatusText.setText("Failed");
-            showSystemMessage("Could not reconnect.");
+            showSystemMessage("Could not reconnect after multiple attempts.");
         });
     }
 
@@ -659,7 +676,7 @@ public class ChatGUI extends JFrame {
     private void sendMessage() {
         String text = inputField.getText().trim();
         if (!text.isEmpty() && isConnected) {
-            String timestamp = new SimpleDateFormat("HH:mm").format(new Date());
+            String timestamp = TimeUtil.now();
             MessageBubble.appendMessage(chatArea, config.getUsername(), text, MessageBubble.MessageType.SENT, timestamp);
             if (networkManager != null) {
                 networkManager.sendMessage(text);
@@ -670,7 +687,7 @@ public class ChatGUI extends JFrame {
     }
 
     public void showSystemMessage(String text) {
-        String timestamp = new SimpleDateFormat("HH:mm").format(new Date());
+        String timestamp = TimeUtil.now();
         SwingUtilities.invokeLater(() -> {
             MessageBubble.appendMessage(chatArea, "System", text, MessageBubble.MessageType.SYSTEM, timestamp);
             scrollToBottom();

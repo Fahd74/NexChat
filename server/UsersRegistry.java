@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Phase 2: Thread-safe singleton registry of all connected users.
+ * Thread-safe singleton registry of all connected users.
  * Maps each username to their socket output stream (PrintWriter).
- * All mutating operations are synchronized to prevent race conditions.
+ * Uses ConcurrentHashMap for safe concurrent access and synchronized
+ * methods for compound operations that require atomicity.
  */
 public class UsersRegistry {
 
@@ -29,14 +30,21 @@ public class UsersRegistry {
     }
 
     /**
-     * Registers a new user with their output stream.
+     * Atomically registers a new user only if the username is not already taken.
+     * This prevents the race condition where two clients with the same username
+     * could both pass a check-then-register sequence.
      *
      * @param username the username to register
      * @param writer   the PrintWriter connected to the user's socket
+     * @return true if registration succeeded, false if the username was already taken
      */
-    public synchronized void register(String username, PrintWriter writer) {
+    public synchronized boolean registerIfAbsent(String username, PrintWriter writer) {
+        if (onlineUsers.containsKey(username)) {
+            return false;
+        }
         onlineUsers.put(username, writer);
         System.out.println("[Registry] Registered: " + username + " | Total online: " + onlineUsers.size());
+        return true;
     }
 
     /**
@@ -88,15 +96,5 @@ public class UsersRegistry {
      */
     public int getUserCount() {
         return onlineUsers.size();
-    }
-
-    /**
-     * Checks if a username is already taken.
-     *
-     * @param username the username to check
-     * @return true if the username is already registered
-     */
-    public boolean isUsernameTaken(String username) {
-        return onlineUsers.containsKey(username);
     }
 }

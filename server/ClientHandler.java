@@ -1,16 +1,17 @@
 package server;
 
+import common.Protocol;
+import common.TimeUtil;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
 
 /**
- * Phase 2: Handles a single client connection on the server side.
+ * Handles a single client connection on the server side.
  * Each instance runs in its own thread and manages reading messages
  * from one client, broadcasting them, and handling disconnection.
  */
@@ -40,38 +41,38 @@ public class ClientHandler implements Runnable {
 
             // --- Handshake: first line must be "USERNAME|john" ---
             String firstLine = in.readLine();
-            if (firstLine == null || !firstLine.startsWith("USERNAME|")) {
+            if (firstLine == null || !firstLine.startsWith(Protocol.USERNAME + Protocol.DELIMITER)) {
                 System.err.println("[ClientHandler] Invalid handshake from " + socket.getRemoteSocketAddress());
                 socket.close();
                 return;
             }
 
-            username = firstLine.substring("USERNAME|".length()).trim();
+            username = firstLine.substring((Protocol.USERNAME + Protocol.DELIMITER).length()).trim();
             if (username.isEmpty()) {
                 System.err.println("[ClientHandler] Empty username received, closing connection.");
                 socket.close();
                 return;
             }
 
-            // Check for duplicate username
-            if (registry.isUsernameTaken(username)) {
-                out.println("SYSTEM|Username '" + username + "' is already taken. Connection refused.|" + timestamp());
+            // Atomic check-and-register to prevent duplicate username race condition
+            if (!registry.registerIfAbsent(username, out)) {
+                out.println(Protocol.systemMessage(
+                        "Username '" + username + "' is already taken. Connection refused.",
+                        TimeUtil.now()));
                 socket.close();
                 return;
             }
 
-            // Register the user
-            registry.register(username, out);
             System.out.println("[Server] " + username + " connected from " + socket.getRemoteSocketAddress());
 
             // Broadcast join event and updated user list
-            registry.broadcast("SYSTEM|" + username + " joined the chat|" + timestamp());
+            registry.broadcast(Protocol.systemMessage(username + " joined the chat", TimeUtil.now()));
             broadcastUserList();
 
             // --- Main message loop ---
             String line;
             while ((line = in.readLine()) != null) {
-                if (line.startsWith("CHAT|")) {
+                if (line.startsWith(Protocol.CHAT + Protocol.DELIMITER)) {
                     // Forward the chat message to all users
                     registry.broadcast(line);
                 } else {
@@ -93,7 +94,7 @@ public class ClientHandler implements Runnable {
     private void handleDisconnect() {
         if (username != null) {
             registry.unregister(username);
-            registry.broadcast("SYSTEM|" + username + " left the chat|" + timestamp());
+            registry.broadcast(Protocol.systemMessage(username + " left the chat", TimeUtil.now()));
             broadcastUserList();
             System.out.println("[Server] " + username + " disconnected.");
         }
@@ -110,14 +111,6 @@ public class ClientHandler implements Runnable {
      */
     private void broadcastUserList() {
         List<String> users = registry.getUserList();
-        String userListMsg = "USERLIST|" + String.join(",", users);
-        registry.broadcast(userListMsg);
-    }
-
-    /**
-     * @return current time formatted as HH:mm
-     */
-    private String timestamp() {
-        return new SimpleDateFormat("HH:mm").format(new Date());
+        registry.broadcast(Protocol.userListMessage(String.join(",", users)));
     }
 }

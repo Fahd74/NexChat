@@ -7,9 +7,10 @@ import java.io.IOException;
 import java.net.Socket;
 
 /**
- * Phase 2: Handles automatic reconnection to the server.
- * Tries up to MAX_ATTEMPTS times with a delay between attempts.
- * Updates the GUI status on each attempt via SwingUtilities.invokeLater().
+ * Handles automatic reconnection to the server after a connection drop.
+ * Runs on a background thread to avoid blocking the EDT.
+ * Tries up to {@link #MAX_ATTEMPTS} times with a {@link #RETRY_DELAY_MS}ms
+ * delay between attempts, updating the GUI status on each attempt.
  */
 public class ReconnectionHandler {
 
@@ -18,7 +19,6 @@ public class ReconnectionHandler {
 
     private final String host;
     private final int port;
-    private final String username;
     private final ChatGUI gui;
     private final NetworkManager networkManager;
 
@@ -27,14 +27,13 @@ public class ReconnectionHandler {
      *
      * @param host           the server host
      * @param port           the server port
-     * @param username       the username to reconnect with
+     * @param username       the username to reconnect with (used by NetworkManager internally)
      * @param gui            the ChatGUI to update during reconnection
      * @param networkManager the NetworkManager to replace the connection on
      */
     public ReconnectionHandler(String host, int port, String username, ChatGUI gui, NetworkManager networkManager) {
         this.host = host;
         this.port = port;
-        this.username = username;
         this.gui = gui;
         this.networkManager = networkManager;
     }
@@ -59,9 +58,8 @@ public class ReconnectionHandler {
                     networkManager.replaceConnection(newSocket);
                     System.out.println("[Reconnect] Reconnected successfully on attempt " + attempt);
 
-                    SwingUtilities.invokeLater(() -> {
-                        gui.onReconnected();
-                    });
+                    // Notify GUI on EDT, but start receiver on a background thread
+                    gui.onReconnected();
                     return; // Exit the loop on success
 
                 } catch (IOException e) {

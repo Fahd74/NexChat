@@ -1,5 +1,7 @@
 package client;
 
+import common.Protocol;
+import common.TimeUtil;
 import ui.ChatGUI;
 
 import java.io.BufferedReader;
@@ -7,13 +9,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 /**
- * Phase 2: Bridges the Swing GUI and the network layer.
+ * Bridges the Swing GUI and the network layer.
  * Manages the Socket, I/O streams, and a background receiver thread.
- * All network operations run OFF the Event Dispatch Thread.
+ * All network operations run OFF the Event Dispatch Thread (EDT).
  */
 public class NetworkManager {
 
@@ -38,7 +38,7 @@ public class NetworkManager {
         out = new PrintWriter(socket.getOutputStream(), true); // autoFlush
 
         // Send username handshake
-        out.println("USERNAME|" + username);
+        out.println(Protocol.usernameMessage(username));
 
         connected = true;
         System.out.println("[NetworkManager] Connected to " + config.getHost() + ":" + config.getPort() + " as " + username);
@@ -46,7 +46,7 @@ public class NetworkManager {
 
     /**
      * Starts a background thread that reads messages from the server
-     * and dispatches them to the GUI via SwingUtilities.invokeLater().
+     * and dispatches them to the GUI via the appropriate callback methods.
      *
      * @param gui the ChatGUI instance to update
      */
@@ -86,7 +86,7 @@ public class NetworkManager {
 
         if (parts.length >= 1) {
             switch (parts[0]) {
-                case "CHAT":
+                case Protocol.CHAT:
                     if (parts.length >= 4) {
                         String sender = parts[1];
                         String text = parts[2];
@@ -98,15 +98,13 @@ public class NetworkManager {
                     }
                     break;
 
-                case "SYSTEM":
+                case Protocol.SYSTEM:
                     if (parts.length >= 3) {
-                        String text = parts[1];
-                        String time = parts[2];
-                        gui.onSystemMessage(text, time);
+                        gui.onSystemMessage(parts[1], parts[2]);
                     }
                     break;
 
-                case "USERLIST":
+                case Protocol.USERLIST:
                     if (parts.length >= 2) {
                         String[] users = parts[1].split(",");
                         gui.onUserListUpdated(users);
@@ -128,8 +126,7 @@ public class NetworkManager {
      */
     public void sendMessage(String text) {
         if (connected && out != null) {
-            String timestamp = new SimpleDateFormat("HH:mm").format(new Date());
-            out.println("CHAT|" + username + "|" + text + "|" + timestamp);
+            out.println(Protocol.chatMessage(username, text, TimeUtil.now()));
         }
     }
 
@@ -182,7 +179,7 @@ public class NetworkManager {
         out = new PrintWriter(socket.getOutputStream(), true);
 
         // Re-send username handshake
-        out.println("USERNAME|" + username);
+        out.println(Protocol.usernameMessage(username));
         connected = true;
     }
 }
