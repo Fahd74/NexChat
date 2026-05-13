@@ -77,9 +77,9 @@ public class LoginDialog extends JDialog {
         formPanel.setOpaque(false);
         formPanel.setBorder(new EmptyBorder(20, 40, 20, 40));
 
-        usernameField = createCustomTextField("developer_01");
+        usernameField = createCustomTextField("Fahd Mohamed Saad");
         serverIpField = createCustomTextField("192.168.1.100"); // Default from image
-        portField = createCustomTextField("8080");
+        portField = createCustomTextField("20443");
 
         addFormField(formPanel, "Username", usernameField);
         addFormField(formPanel, "Server IP", serverIpField);

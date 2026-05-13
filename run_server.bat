@@ -9,6 +9,6 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [2/2] Starting Server on port 8080...
-java server.Server 8080
+echo [2/2] Starting Server on port 20443...
+java server.Server 20443
 pause

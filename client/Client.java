@@ -222,7 +222,7 @@ public class Client {
     public static void main(String[] args) {
         if (args.length < 3) {
             System.out.println("Usage: java client.Client <host> <port> <username>");
-            System.out.println("Example: java client.Client localhost 8080 Alice");
+            System.out.println("Example: java client.Client localhost 20443 Fahd");
             System.exit(1);
         }
 

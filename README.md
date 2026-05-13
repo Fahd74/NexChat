@@ -34,7 +34,7 @@ This project strictly adheres to standard Java SE, utilizing only built-in libra
 ### Option 1: Using the Batch Scripts (Windows - Recommended)
 For a quick and easy start, use the included automation scripts. They automatically compile the source code and start the application.
 
-1.  Double-click `run_server.bat` to start the server (runs on port 8080 by default).
+1.  Double-click `run_server.bat` to start the server (runs on port 20443 by default).
 2.  Double-click `run_client.bat` to launch the GUI Client.
 3.  *(Optional)* You can run `run_client.bat` multiple times to simulate multiple different users connecting to the same server.
 
@@ -49,7 +49,7 @@ javac common/*.java server/*.java client/*.java ui/*.java
 **2. Start the Server:**
 *(Syntax: java server.Server <port>)*
 ```bash
-java server.Server 8080
+java server.Server 20443
 ```
 
 **3. Start the Client GUI:**
