@@ -337,7 +337,7 @@ public class ChatGUI extends JFrame {
         JPanel pTextPanel = new JPanel();
         pTextPanel.setLayout(new BoxLayout(pTextPanel, BoxLayout.Y_AXIS));
         pTextPanel.setOpaque(false);
-        JLabel pName = new JLabel("Profile");
+        JLabel pName = new JLabel(config.getUsername());
         pName.setForeground(Color.WHITE);
         pName.setFont(new Font("Segoe UI", Font.BOLD, 13));
         JLabel pStatus = new JLabel("Online");
